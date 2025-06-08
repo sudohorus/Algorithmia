@@ -1,13 +1,16 @@
 from PyQt6.QtWidgets import (
     QMainWindow, QVBoxLayout, QWidget, QMenuBar, 
     QStatusBar, QFileDialog, QMessageBox, QLabel,
-    QCheckBox, QHBoxLayout
+    QCheckBox, QHBoxLayout, QDialog, QLineEdit,
+    QPushButton, QGridLayout, QInputDialog
 )
 from PyQt6.QtCore import Qt, QSize, QTimer
-from PyQt6.QtGui import QFont, QAction, QIcon
+from PyQt6.QtGui import QFont, QAction, QIcon, QTextCursor, QTextDocument, QPalette
 from ..core.editor import EditorCore
 from ..utils.config import Config
 from .code_editor import CodeEditor
+from .find_replace_dialog import FindReplaceDialog
+from .theme_manager import ThemeManager
 import os
 
 class MainWindow(QMainWindow):
@@ -15,13 +18,14 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.editor_core = EditorCore()
+        self.theme_manager = ThemeManager()
+        self.find_replace_dialog = None
         self.init_ui()
         self.setup_editor()
         self.create_menu_bar()
         self.create_status_bar()
         self.connect_signals()
         
-        # Timer para atualizar status
         self.status_timer = QTimer()
         self.status_timer.timeout.connect(self.update_status_info)
         self.status_timer.start(100)
@@ -51,6 +55,7 @@ class MainWindow(QMainWindow):
         self.text_editor.show_line_numbers = Config.SHOW_LINE_NUMBERS
         self.text_editor.highlight_current_line = Config.HIGHLIGHT_CURRENT_LINE
         self.text_editor.setCursorWidth(Config.CURSOR_WIDTH)
+        self.text_editor.auto_complete_pairs = Config.AUTO_COMPLETE_PAIRS
         
         theme = Config.get_light_theme()
         self.text_editor.set_theme_colors(
@@ -110,6 +115,10 @@ class MainWindow(QMainWindow):
         
         edit_menu.addSeparator()
         
+        self.find_replace_action = QAction("&Find and Replace", self)
+        self.find_replace_action.setShortcut("Ctrl+F")
+        edit_menu.addAction(self.find_replace_action)
+        
         self.goto_line_action = QAction("&Go to Line...", self)
         self.goto_line_action.setShortcut("Ctrl+G")
         edit_menu.addAction(self.goto_line_action)
@@ -133,6 +142,27 @@ class MainWindow(QMainWindow):
         self.toggle_word_wrap_action.setCheckable(True)
         self.toggle_word_wrap_action.setChecked(Config.WORD_WRAP)
         view_menu.addAction(self.toggle_word_wrap_action)
+
+        view_menu.addSeparator()
+
+        self.toggle_auto_complete_action = QAction("&Auto-complete Pairs", self)
+        self.toggle_auto_complete_action.setCheckable(True)
+        self.toggle_auto_complete_action.setChecked(Config.AUTO_COMPLETE_PAIRS)
+        view_menu.addAction(self.toggle_auto_complete_action)
+
+        view_menu.addSeparator()
+
+        # submenu de temas
+        theme_menu = view_menu.addMenu("&Theme")
+        
+        self.light_theme_action = QAction("&Light", self)
+        self.light_theme_action.setCheckable(True)
+        self.light_theme_action.setChecked(True)
+        theme_menu.addAction(self.light_theme_action)
+        
+        self.dark_theme_action = QAction("&Dark", self)
+        self.dark_theme_action.setCheckable(True)
+        theme_menu.addAction(self.dark_theme_action)
     
     def create_status_bar(self):
         """ cria a barra de status com informações detalhadas """
@@ -163,12 +193,18 @@ class MainWindow(QMainWindow):
         # ações de edição
         self.undo_action.triggered.connect(self.text_editor.undo)
         self.redo_action.triggered.connect(self.text_editor.redo)
+        self.find_replace_action.triggered.connect(self.show_find_replace_dialog)
         self.goto_line_action.triggered.connect(self.go_to_line_dialog)
 
         # ações de visualização
         self.toggle_line_numbers_action.triggered.connect(self.toggle_line_numbers)
         self.toggle_current_line_action.triggered.connect(self.toggle_current_line_highlight)
         self.toggle_word_wrap_action.triggered.connect(self.toggle_word_wrap)
+        self.toggle_auto_complete_action.triggered.connect(self.toggle_auto_complete)
+
+        # ações de tema
+        self.light_theme_action.triggered.connect(lambda: self.change_theme("light"))
+        self.dark_theme_action.triggered.connect(lambda: self.change_theme("dark"))
 
         # detecta mudanças no texto
         self.text_editor.textChanged.connect(self.on_text_changed)
@@ -245,8 +281,6 @@ class MainWindow(QMainWindow):
 
     def go_to_line_dialog(self):
         """ dialog para ir para linha específica """
-        from PyQt6.QtWidgets import QInputDialog
-        
         current_line = self.text_editor.get_current_line_number()
         total_lines = self.text_editor.blockCount()
         
@@ -277,6 +311,11 @@ class MainWindow(QMainWindow):
         else:
             self.text_editor.setLineWrapMode(self.text_editor.LineWrapMode.NoWrap)
         self.status_bar.showMessage("Word wrap toggled", 1000)
+
+    def toggle_auto_complete(self):
+        """ alterna auto-completar de parênteses """
+        self.text_editor.auto_complete_pairs = self.toggle_auto_complete_action.isChecked()
+        self.status_bar.showMessage("Auto-complete pairs toggled", 1000)
                 
     def on_text_changed(self):
         """ quando modificar texto """
@@ -326,3 +365,33 @@ class MainWindow(QMainWindow):
             event.accept()
         else:
             event.ignore()
+
+    def change_theme(self, theme_name):
+        """ altera o tema do editor """
+        if theme_name == self.theme_manager.current_theme:
+            return
+
+        # atualiza os checkboxes do menu
+        self.light_theme_action.setChecked(theme_name == "light")
+        self.dark_theme_action.setChecked(theme_name == "dark")
+        
+        # aplica o tema
+        self.theme_manager.apply_theme(theme_name, self)
+        self.status_bar.showMessage(f"Theme changed to {theme_name}", 2000)
+
+    def show_find_replace_dialog(self):
+        """ mostra o diálogo de busca e substituição """
+        if not self.find_replace_dialog:
+            self.find_replace_dialog = FindReplaceDialog(self)
+        
+        # posiciona o diálogo próximo ao cursor
+        cursor_rect = self.text_editor.cursorRect()
+        global_pos = self.text_editor.mapToGlobal(cursor_rect.topRight())
+        
+        self.find_replace_dialog.move(global_pos)
+        self.find_replace_dialog.show()
+        
+        # se houver texto selecionado, usa como texto de busca
+        cursor = self.text_editor.textCursor()
+        if cursor.hasSelection():
+            self.find_replace_dialog.find_edit.setText(cursor.selectedText())

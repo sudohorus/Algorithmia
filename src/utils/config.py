@@ -12,6 +12,7 @@ class Config:
     WORD_WRAP = False
     HIGHLIGHT_CURRENT_LINE = True
     CURSOR_WIDTH = 2
+    AUTO_COMPLETE_PAIRS = True
     
     # janela
     DEFAULT_WIDTH = 1000
@@ -19,36 +20,43 @@ class Config:
     MIN_WIDTH = 800
     MIN_HEIGHT = 600
 
-    # cores - linhas
-    LINE_NUMBER_BG_COLOR = QColor(245, 245, 245)
-    LINE_NUMBER_TEXT_COLOR = QColor(100, 100, 100)
-    LINE_NUMBER_CURRENT_COLOR = QColor(50, 50, 50)
+    # cores - tema claro
+    LIGHT_THEME = {
+        'line_number_bg': QColor(245, 245, 245),
+        'line_number_text': QColor(100, 100, 100),
+        'line_number_current': QColor(50, 50, 50),
+        'current_line_highlight': QColor(255, 255, 224, 80),
+        'editor_bg': QColor(255, 255, 255),
+        'editor_text': QColor(0, 0, 0),
+        'window_bg': QColor(240, 240, 240),
+        'menu_bg': QColor(240, 240, 240),
+        'menu_text': QColor(0, 0, 0),
+        'status_bar_bg': QColor(240, 240, 240),
+        'status_bar_text': QColor(0, 0, 0),
+        'selection_bg': QColor(51, 153, 255),
+        'selection_text': QColor(255, 255, 255)
+    }
 
-    # cores - editor
-    CURRENT_LINE_HIGHLIGHT_COLOR = QColor(255, 255, 224, 80)
-    EDITOR_BG_COLOR = QColor(255, 255, 255)
-    EDITOR_TEXT_COLOR = QColor(0, 0, 0)
-
-    # tema escuro
+    # cores - tema escuro
     DARK_THEME = {
         'line_number_bg': QColor(40, 40, 40),
         'line_number_text': QColor(120, 120, 120),
         'line_number_current': QColor(200, 200, 200),
-        'current_line_highlight': QColor(60, 60, 60, 100),
+        'current_line_highlight': QColor(60, 60, 60),
         'editor_bg': QColor(30, 30, 30),
-        'editor_text': QColor(220, 220, 220)
+        'editor_text': QColor(220, 220, 220),
+        'window_bg': QColor(45, 45, 45),
+        'menu_bg': QColor(45, 45, 45),
+        'menu_text': QColor(220, 220, 220),
+        'status_bar_bg': QColor(35, 35, 35),
+        'status_bar_text': QColor(200, 200, 200),
+        'selection_bg': QColor(70, 130, 180),
+        'selection_text': QColor(255, 255, 255)
     }
 
     @classmethod
     def get_light_theme(cls):
-        return {
-            'line_number_bg': cls.LINE_NUMBER_BG_COLOR,
-            'line_number_text': cls.LINE_NUMBER_TEXT_COLOR,
-            'line_number_current': cls.LINE_NUMBER_CURRENT_COLOR,
-            'current_line_highlight': cls.CURRENT_LINE_HIGHLIGHT_COLOR,
-            'editor_bg': cls.EDITOR_BG_COLOR,
-            'editor_text': cls.EDITOR_TEXT_COLOR
-        }
+        return cls.LIGHT_THEME
     
     @classmethod
     def get_dark_theme(cls):

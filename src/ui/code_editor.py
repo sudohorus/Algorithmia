@@ -1,6 +1,9 @@
 from PyQt6.QtWidgets import QWidget, QTextEdit
 from PyQt6.QtCore import Qt, QRect, pyqtSignal
-from PyQt6.QtGui import QPainter, QColor, QTextFormat, QFont, QPaintEvent, QResizeEvent
+from PyQt6.QtGui import (
+    QPainter, QColor, QTextFormat, QFont, QPaintEvent, 
+    QResizeEvent, QKeyEvent, QTextCursor
+)
 
 class LineNumberArea(QWidget):
     """ widget para exibir a numeração de linhas """
@@ -31,6 +34,16 @@ class CodeEditor(QTextEdit):
         
         self.show_line_numbers = True
         self.highlight_current_line = True
+        self.auto_complete_pairs = True
+        
+        # pares de caracteres para auto-completar
+        self.pairs = {
+            '(': ')',
+            '[': ']',
+            '{': '}',
+            '"': '"',
+            "'": "'"
+        }
         
         self.update_line_number_area_width()
         self.highlight_current_line_func()
@@ -213,3 +226,55 @@ class CodeEditor(QTextEdit):
             self.ensureCursorVisible()
             return True
         return False
+
+    def keyPressEvent(self, event: QKeyEvent):
+        """ processa eventos de teclado """
+        if self.auto_complete_pairs and event.text() in self.pairs:
+            # auto-completa pares
+            cursor = self.textCursor()
+            opening_char = event.text()
+            closing_char = self.pairs[opening_char]
+            
+            # se há texto selecionado, envolve com os caracteres
+            if cursor.hasSelection():
+                start = cursor.selectionStart()
+                end = cursor.selectionEnd()
+                text = cursor.selectedText()
+                
+                cursor.beginEditBlock()
+                cursor.setPosition(start)
+                cursor.insertText(opening_char)
+                cursor.setPosition(end + 1)  # +1 pelo caractere inserido
+                cursor.insertText(closing_char)
+                cursor.endEditBlock()
+                
+                # seleciona o texto novamente
+                cursor.setPosition(start)
+                cursor.movePosition(QTextCursor.MoveOperation.KeepAnchor, n=(end - start + 2))
+                self.setTextCursor(cursor)
+            else:
+                # insere o par e move o cursor para o meio
+                cursor.insertText(opening_char + closing_char)
+                cursor.movePosition(QTextCursor.MoveOperation.Left)
+                self.setTextCursor(cursor)
+            return
+        elif self.auto_complete_pairs and event.key() == Qt.Key.Key_Backspace:
+            # remove o par se estiver entre eles
+            cursor = self.textCursor()
+            if not cursor.hasSelection():
+                pos = cursor.position()
+                if pos > 0:
+                    cursor.movePosition(QTextCursor.MoveOperation.Left, QTextCursor.MoveMode.KeepAnchor)
+                    char_before = cursor.selectedText()
+                    
+                    if char_before in self.pairs:
+                        cursor.movePosition(QTextCursor.MoveOperation.Right)
+                        cursor.movePosition(QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.KeepAnchor)
+                        char_after = cursor.selectedText()
+                        
+                        if char_after == self.pairs[char_before]:
+                            cursor.removeSelectedText()
+                            cursor.deletePreviousChar()
+                            return
+        
+        super().keyPressEvent(event)
